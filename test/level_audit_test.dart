@@ -44,4 +44,23 @@ void main() {
     }
     expect(LevelRepository.getLevel(1).powerUps, isEmpty);
   });
+
+  test('hard levels get a locked house and/or a gate; medium levels from 15 get a gate', () {
+    for (int i = 10; i <= 100; i += 10) {
+      final d = LevelRepository.getLevel(i);
+      final variant = (i ~/ 10) % 3;
+      expect(d.keyPosition != null, variant == 1 || variant == 0, reason: 'key on level $i');
+      expect(d.gate != null, variant == 2 || variant == 0, reason: 'gate on level $i');
+    }
+    for (int i = 15; i <= 95; i += 10) {
+      expect(LevelRepository.getLevel(i).gate, isNotNull, reason: 'medium level $i');
+    }
+    expect(LevelRepository.getLevel(5).gate, isNull);
+    for (int i = 1; i <= 100; i++) {
+      if (i % 5 != 0) {
+        expect(LevelRepository.getLevel(i).gate, isNull);
+        expect(LevelRepository.getLevel(i).keyPosition, isNull);
+      }
+    }
+  });
 }

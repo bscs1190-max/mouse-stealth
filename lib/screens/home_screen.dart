@@ -7,6 +7,7 @@ import '../game/services/cosmetics_service.dart';
 import '../game/services/progress_service.dart';
 import '../ui/theme/app_theme.dart';
 import '../ui/widgets/game_ui.dart';
+import '../ui/tutorial_overlay.dart';
 import 'game_screen.dart';
 import 'level_select_screen.dart';
 import 'shop_screen.dart';
@@ -32,6 +33,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void dispose() {
     _bob.dispose();
     super.dispose();
+  }
+
+  void _openGuide() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (ctx) => TutorialOverlay(onDone: () => Navigator.of(ctx).pop(), finishLabel: 'GOT IT'),
+      ),
+    );
   }
 
   void _open(Widget screen) {
@@ -117,17 +127,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
                       // Title
                       ShaderMask(
-                        shaderCallback: (r) => const LinearGradient(
-                          colors: [AppColors.cheese, Color(0xFFFFE8A3), AppColors.cheese],
-                        ).createShader(r),
+                        shaderCallback: (r) =>
+                            const LinearGradient(colors: [AppColors.cheese, Color(0xFFFFE8A3), AppColors.cheese])
+                                .createShader(r),
                         child: Text(
                           'MOUSE\nSTEALTH',
                           textAlign: TextAlign.center,
                           style: AppText.display(compact ? 40 : 52, color: Colors.white).copyWith(
                             letterSpacing: 3,
-                            shadows: [
-                              Shadow(color: AppColors.cheeseDeep.withValues(alpha: 0.7), blurRadius: 24),
-                            ],
+                            shadows: [Shadow(color: AppColors.cheeseDeep.withValues(alpha: 0.7), blurRadius: 24)],
                           ),
                         ),
                       ),
@@ -176,17 +184,52 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                       SizedBox(height: compact ? 14 : 28),
 
-                      // How to play
-                      GlassCard(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: const [
-                            _Tip(icon: Icons.touch_app_rounded, color: AppColors.mint, title: 'Tap', sub: 'to move'),
-                            _Tip(icon: Icons.radar_rounded, color: AppColors.coral, title: 'Radar', sub: 'stay outside'),
-                            _Tip(icon: Icons.grid_view_rounded, color: AppColors.violet, title: 'Walls', sub: 'break sight'),
-                            _Tip(icon: Icons.home_rounded, color: AppColors.cheese, title: 'House', sub: 'to win'),
-                          ],
+                      GestureDetector(
+                        onTap: _openGuide,
+                        child: GlassCard(
+                          padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                          child: Column(
+                            children: [
+                              const Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                children: [
+                                  _Tip(
+                                    icon: Icons.touch_app_rounded,
+                                    color: AppColors.mint,
+                                    title: 'Tap',
+                                    sub: 'to move',
+                                  ),
+                                  _Tip(
+                                    icon: Icons.radar_rounded,
+                                    color: AppColors.coral,
+                                    title: 'Radar',
+                                    sub: 'stay outside',
+                                  ),
+                                  _Tip(
+                                    icon: Icons.grid_view_rounded,
+                                    color: AppColors.violet,
+                                    title: 'Walls',
+                                    sub: 'break sight',
+                                  ),
+                                  _Tip(
+                                    icon: Icons.home_rounded,
+                                    color: AppColors.cheese,
+                                    title: 'House',
+                                    sub: 'to win',
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.help_outline_rounded, size: 15, color: AppColors.textMuted),
+                                  const SizedBox(width: 5),
+                                  Text('Tap for the full guide', style: AppText.body(12)),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],

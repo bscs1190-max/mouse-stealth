@@ -3,6 +3,7 @@ import 'package:flame/extensions.dart';
 import '../models/cat_state.dart';
 import '../models/theme_config.dart';
 import '../rendering/procedural_obstacle_component.dart';
+import '../models/level_mechanics.dart';
 import '../models/power_up.dart';
 import 'level_generator.dart';
 
@@ -24,6 +25,8 @@ class MazeLevelData {
   final ThemeConfig theme;
   final List<PowerUpPlacement> powerUps;
   final int hammerCharges; // Wall-breaker uses for this level
+  final GatePlacement? gate; // Gate opened by a wall button
+  final Vector2? keyPosition; // Non-null: the house is locked until the key is collected
 
   const MazeLevelData({
     required this.levelNumber,
@@ -43,6 +46,8 @@ class MazeLevelData {
     this.timeLimitSeconds = 90,
     this.powerUps = const [],
     this.hammerCharges = 1,
+    this.gate,
+    this.keyPosition,
   });
 }
 

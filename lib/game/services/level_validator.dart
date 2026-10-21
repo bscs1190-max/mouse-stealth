@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flame/extensions.dart';
 
+import '../models/power_up.dart';
 import '../rendering/procedural_obstacle_component.dart';
 import '../systems/navigation_system.dart';
 import 'level_repository.dart';
@@ -15,27 +18,33 @@ class LevelValidator {
     GridPoint cell(Vector2 v) => GridPoint((v.x / t).floor(), (v.y / t).floor());
     int manhattan(GridPoint a, GridPoint b) => (a.x - b.x).abs() + (a.y - b.y).abs();
 
-    // Grid as the game sees it: crates and bushes block movement.
-    final blocked = List.generate(h, (y) => List.generate(w, (x) => !d.walkableGrid[y][x]));
+    // Blocked-cell grids (true = blocked). `open` is the gate-open state: walls and crates
+    // block movement; `closed` additionally blocks the gate tile.
+    final open = List.generate(h, (y) => List.generate(w, (x) => !d.walkableGrid[y][x]));
     final traps = <GridPoint>{};
-    final crates = <GridPoint>{};
     for (final o in d.obstacles) {
       final c = cell(o.position);
-      if (o.kind == ObstacleKind.crate || o.kind == ObstacleKind.bush) {
-        blocked[c.y][c.x] = true;
-        crates.add(c);
-      }
+      if (o.kind == ObstacleKind.crate || o.kind == ObstacleKind.bush) open[c.y][c.x] = true;
       if (o.kind == ObstacleKind.trap) traps.add(c);
     }
+    // Same grid with the gate shut.
+    final closed = [
+      for (final row in open) [...row],
+    ];
+    final gateCell = d.gate == null ? null : cell(d.gate!.gate);
+    if (gateCell != null) closed[gateCell.y][gateCell.x] = true;
 
     final spawn = cell(d.mouseSpawn);
     final house = cell(d.housePosition);
     final cheese = d.cheesePositions.map(cell).toList();
     final powerUps = d.powerUps.map((p) => cell(p.position)).toList();
-    if (blocked[spawn.y][spawn.x]) issues.add('mouse spawn is blocked');
-    if (blocked[house.y][house.x]) issues.add('house is blocked');
+    final keyCell = d.keyPosition == null ? null : cell(d.keyPosition!);
+    final pressCell = d.gate == null ? null : cell(d.gate!.pressSpot);
+    final switchWall = d.gate == null ? null : cell(d.gate!.switchWall);
+    if (open[spawn.y][spawn.x]) issues.add('mouse spawn is blocked');
+    if (open[house.y][house.x]) issues.add('house is blocked');
 
-    Map<GridPoint, int> flood(GridPoint from, {bool avoidTraps = false}) {
+    Map<GridPoint, int> flood(GridPoint from, List<List<bool>> blockedGrid, {bool avoidTraps = true}) {
       final dist = <GridPoint, int>{from: 0};
       final q = [from];
       for (int i = 0; i < q.length; i++) {
@@ -43,7 +52,7 @@ class LevelValidator {
         for (final dlt in _dirs) {
           final n = GridPoint(p.x + dlt.x, p.y + dlt.y);
           if (n.x < 0 || n.y < 0 || n.x >= w || n.y >= h) continue;
-          if (blocked[n.y][n.x] || (avoidTraps && traps.contains(n))) continue;
+          if (blockedGrid[n.y][n.x] || (avoidTraps && traps.contains(n))) continue;
           if (dist.containsKey(n)) continue;
           dist[n] = dist[p]! + 1;
           q.add(n);
@@ -52,26 +61,68 @@ class LevelValidator {
       return dist;
     }
 
-    final reach = flood(spawn);
-    // Everything must be collectable WITHOUT stepping on a trap.
-    final safe = flood(spawn, avoidTraps: true);
-    if (!reach.containsKey(house)) {
+    final anyOpen = flood(spawn, open, avoidTraps: false);
+    final safeOpenS = flood(spawn, open); // gate open, no traps
+    final safeOpenH = flood(house, open);
+    final safeClosed = flood(spawn, closed); // gate shut, no traps
+
+    if (!anyOpen.containsKey(house)) {
       issues.add('house is unreachable (path closed)');
-    } else if (!safe.containsKey(house)) {
+    } else if (!safeOpenS.containsKey(house)) {
       issues.add('every route to the house crosses a trap');
     }
+    final shortest = safeOpenS[house] ?? 0;
+    int detour(GridPoint p) => (safeOpenS[p] ?? 999) + (safeOpenH[p] ?? 999) - shortest;
+
+    // Gate: must really block the house, and everything else is reachable before it opens.
+    if (gateCell != null) {
+      if (flood(spawn, closed, avoidTraps: false).containsKey(house)) issues.add('the gate does not block the way');
+      if (open[switchWall!.y][switchWall.x] == false) issues.add('wall button is not on a wall');
+      if (manhattan(switchWall, pressCell!) != 1) issues.add('wall button is not next to its press spot');
+      if (!safeClosed.containsKey(pressCell)) issues.add('wall button cannot be reached before the gate');
+      if (detour(pressCell) > 10) issues.add('wall button is ${detour(pressCell)} steps off the route');
+    }
+    final before = gateCell == null ? safeOpenS : safeClosed;
+
     for (int i = 0; i < cheese.length; i++) {
       final c = cheese[i];
-      if (blocked[c.y][c.x]) {
+      if (open[c.y][c.x]) {
         issues.add('cheese $i sits inside a wall/crate');
-      } else if (!reach.containsKey(c)) {
+      } else if (!anyOpen.containsKey(c)) {
         issues.add('cheese $i is unreachable');
-      } else if (!safe.containsKey(c)) {
-        issues.add('cheese $i can only be reached through a trap');
+      } else if (!before.containsKey(c)) {
+        issues.add('cheese $i can only be reached through a trap or the gate');
+      } else if (detour(c) > 18) {
+        issues.add('cheese $i is too far off the route (${detour(c)} steps)');
       }
     }
+    if (cheese.isNotEmpty && !cheese.any((c) => detour(c) <= 8)) issues.add('no cheese is on the way to the house');
     for (int i = 0; i < powerUps.length; i++) {
-      if (!safe.containsKey(powerUps[i])) issues.add('power-up $i can only be reached through a trap');
+      final p = powerUps[i];
+      if (!before.containsKey(p)) {
+        issues.add('power-up $i can only be reached through a trap or the gate');
+      } else if (detour(p) > 6) {
+        issues.add('power-up $i is ${detour(p)} steps off the route, so nobody will grab it');
+      } else {
+        // Needed most near the cats, measured in WALKING steps (about 3.6 per second):
+        // close enough to use before the effect ends, not so close it is inside a cat zone.
+        final from = flood(p, open, avoidTraps: false);
+        var nearest = 999;
+        for (final cat in d.cats) {
+          final wp = cat.patrolWaypoints.first;
+          nearest = math.min(nearest, from[GridPoint(wp[0], wp[1])] ?? 999);
+        }
+        if (d.cats.isNotEmpty && (nearest > 16 || nearest < 3)) {
+          issues.add("power-up $i is $nearest steps from the nearest cat (want 3-16)");
+        }
+        if (d.powerUps[i].kind == PowerUpKind.freeze && !cheese.any((c) => (from[c] ?? 999) <= 20)) {
+          issues.add("freeze orb $i has no cheese within reach of its 6 seconds");
+        }
+      }
+    }
+    if (keyCell != null) {
+      if (!before.containsKey(keyCell)) issues.add('key is unreachable before the gate');
+      if (detour(keyCell) > 12) issues.add('key is too far off the route');
     }
 
     // Items must not share/crowd tiles.
@@ -80,6 +131,9 @@ class LevelValidator {
       'house': house,
       for (int i = 0; i < cheese.length; i++) 'cheese $i': cheese[i],
       for (int i = 0; i < powerUps.length; i++) 'power-up $i': powerUps[i],
+      'key': ?keyCell,
+      'button': ?pressCell,
+      'gate': ?gateCell,
     };
     final names = items.keys.toList();
     for (int i = 0; i < names.length; i++) {
@@ -105,9 +159,11 @@ class LevelValidator {
     for (final cat in d.cats) {
       for (final wp in cat.patrolWaypoints) {
         final p = GridPoint(wp[0], wp[1]);
-        if (p.x < 0 || p.y < 0 || p.x >= w || p.y >= h || blocked[p.y][p.x]) {
+        if (p.x < 0 || p.y < 0 || p.x >= w || p.y >= h || open[p.y][p.x]) {
           issues.add('${cat.id} waypoint (${p.x},${p.y}) is on a wall');
+          continue;
         }
+        if (!before.containsKey(p)) issues.add('${cat.id} waypoint (${p.x},${p.y}) is behind the gate');
         for (final e in items.entries) {
           if (manhattan(p, e.value) < 2) issues.add('${cat.id} waypoint sits on ${e.key}');
         }

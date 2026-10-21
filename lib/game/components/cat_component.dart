@@ -54,6 +54,9 @@ class CatComponent extends PositionComponent {
     reset();
   }
 
+  /// Tile centres of the cat's whole patrol loop (read-only view, for level logic).
+  List<Vector2> get patrolRoute => _route;
+
   /// Remaining chase time in 0..1 (for the radar ring).
   double get chaseProgress =>
       state == CatState.chase ? (_chaseTimer / config.maxChaseSeconds).clamp(0.0, 1.0) : 0.0;

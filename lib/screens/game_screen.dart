@@ -1,13 +1,20 @@
+import 'dart:math' as math;
+
+import 'package:flame/extensions.dart';
 import 'package:flame/game.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../game/models/game_state.dart';
 import '../game/mouse_house_game.dart';
 import '../game/systems/scoring_system.dart';
+import '../game/services/progress_service.dart';
+import '../ui/demo/demo_scene.dart';
 import '../ui/game_over_dialog.dart';
 import '../ui/hud_overlay.dart';
 import '../ui/level_complete_dialog.dart';
+import '../ui/tutorial_overlay.dart';
 
 class GameScreen extends StatefulWidget {
   final int levelNumber;
@@ -60,6 +67,84 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
+  // --------------------------------------------------------------------------
+  // Touch: tap = move, one finger drag = pan, two fingers = pinch zoom,
+  // mouse wheel = zoom (desktop / web).
+  // --------------------------------------------------------------------------
+  final Map<int, Offset> _pointers = {};
+  int? _tapPointer;
+  Offset _downPos = Offset.zero;
+  DateTime _downTime = DateTime.now();
+  bool _dragging = false;
+  double _lastSpan = 0;
+  Offset _lastFocal = Offset.zero;
+
+  Vector2 _v(Offset o) => Vector2(o.dx, o.dy);
+
+  void _onPointerDown(PointerDownEvent e) {
+    _pointers[e.pointer] = e.localPosition;
+    if (_pointers.length == 1) {
+      _tapPointer = e.pointer;
+      _downPos = e.localPosition;
+      _downTime = DateTime.now();
+      _dragging = false;
+    } else {
+      _tapPointer = null; // a second finger turns this into a pinch
+      _startPinch();
+    }
+  }
+
+  void _startPinch() {
+    final p = _pointers.values.take(2).toList();
+    _lastSpan = (p[0] - p[1]).distance;
+    _lastFocal = (p[0] + p[1]) / 2;
+  }
+
+  void _onPointerMove(PointerMoveEvent e) {
+    if (!_pointers.containsKey(e.pointer) || !_game.isLoaded) return;
+    _pointers[e.pointer] = e.localPosition;
+    if (_pointers.length >= 2) {
+      final p = _pointers.values.take(2).toList();
+      final span = (p[0] - p[1]).distance;
+      final focal = (p[0] + p[1]) / 2;
+      if (_lastSpan > 8) _game.pinchZoom(_v(focal), span / _lastSpan);
+      _game.panBy(_v(focal - _lastFocal));
+      _lastSpan = span;
+      _lastFocal = focal;
+    } else {
+      if (!_dragging && (e.localPosition - _downPos).distance > 10) _dragging = true;
+      if (_dragging) _game.panBy(_v(e.delta));
+    }
+  }
+
+  void _onPointerUp(PointerUpEvent e) {
+    final isTap = _tapPointer == e.pointer &&
+        !_dragging &&
+        _pointers.length == 1 &&
+        DateTime.now().difference(_downTime).inMilliseconds < 600;
+    _pointers.remove(e.pointer);
+    if (isTap) _game.handleTap(_v(e.localPosition));
+    _endGestureIfIdle();
+  }
+
+  void _onPointerCancel(PointerCancelEvent e) {
+    _pointers.remove(e.pointer);
+    _endGestureIfIdle();
+  }
+
+  void _endGestureIfIdle() {
+    _tapPointer = null;
+    _lastSpan = 0;
+    // The remaining finger keeps panning after a pinch.
+    _dragging = _pointers.isNotEmpty;
+  }
+
+  void _onPointerSignal(PointerSignalEvent e) {
+    if (e is PointerScrollEvent && _game.isLoaded) {
+      _game.pinchZoom(_v(e.localPosition), math.exp(-e.scrollDelta.dy / 400));
+    }
+  }
+
   void _loadNextLevel() {
     if (_game.session.status != GameStatus.success) return; // ignore double taps
     if (currentLevel < 100) {
@@ -90,22 +175,29 @@ class _GameScreenState extends State<GameScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          GameWidget(key: ValueKey(currentLevel), game: _game),
+          Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: _onPointerDown,
+            onPointerMove: _onPointerMove,
+            onPointerUp: _onPointerUp,
+            onPointerCancel: _onPointerCancel,
+            onPointerSignal: _onPointerSignal,
+            child: GameWidget(key: ValueKey(currentLevel), game: _game),
+          ),
 
           if (session != null)
             HudOverlay(
               levelData: _game.levelData,
               session: session,
-              currentZoom: _game.userZoomFactor,
+              keyCollected: _game.keyComponent == null ? null : _game.hasKey,
+              gateOpen: _game.gateComponent == null ? null : _game.gateOpen,
               spotted: _game.mouseComponent.isAlert,
               lifeLostMessage: _game.caughtFlashTimer > 0 ? _game.lastLifeLostReason : null,
               toastMessage: _game.toastMessage,
               activeEffects: Map.of(_game.activeEffects),
               hammerCharges: _game.hammerCharges,
               breakMode: _game.breakMode,
-              onZoomIn: _game.zoomIn,
-              onZoomOut: _game.zoomOut,
-              onResetZoom: _game.resetZoom,
+              onFitPressed: _game.resetCamera,
               onHintPressed: _game.showHint,
               onResetPressed: _game.resetLevel,
               onBreakPressed: _game.toggleBreakMode,
@@ -122,11 +214,19 @@ class _GameScreenState extends State<GameScreen> {
             ),
           ),
 
-          if (status == GameStatus.paused)
+          if (status == GameStatus.paused && currentLevel == 1 && !ProgressService().tutorialSeen)
+            TutorialOverlay(
+              onDone: () {
+                ProgressService().tutorialSeen = true;
+                _game.startLevel();
+              },
+            )
+          else if (status == GameStatus.paused)
             SafeArea(
               child: LevelIntroCard(
                 levelData: _game.levelData,
                 notes: _game.introNotes,
+                demos: demosForLevel(currentLevel),
                 onStart: _game.startLevel,
               ),
             ),

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flame/extensions.dart';
 
 import '../models/cat_state.dart';
+import '../models/level_mechanics.dart';
 import '../models/power_up.dart';
 import '../models/theme_config.dart';
 import '../rendering/procedural_obstacle_component.dart';
@@ -144,6 +145,7 @@ class LevelGenerator {
     grid[houseG.y][houseG.x] = true;
 
     final distFromSpawn = _bfs(grid, spawnG);
+    final distFromHouse = _bfs(grid, houseG);
     if (!distFromSpawn.containsKey(houseG)) return null;
 
     final nav = NavigationSystem(mapWidth: w, mapHeight: h, tileSize: t, walkableGrid: grid);
@@ -170,6 +172,7 @@ class LevelGenerator {
     final vision = math.min(82.0 + level * 0.2, 104.0);
     final visionTiles = vision / t + 1.6;
     final cats = <CatConfig>[];
+    final catCellSets = <Set<GridPoint>>[]; // patrol cells per cat
     final catAnchors = <GridPoint>[];
     final catCells = <GridPoint>{};
     for (int i = 0; i < diff.catCount; i++) {
@@ -207,10 +210,13 @@ class LevelGenerator {
       }
       if (waypoints == null) return null;
       catAnchors.add(waypoints.first);
+      final mine = <GridPoint>{};
       for (int k = 0; k < waypoints.length; k++) {
         final a = waypoints[k], b = waypoints[(k + 1) % waypoints.length];
-        catCells.addAll(nav.findPath(_pos(a), _pos(b)).map(nav.worldToGrid));
+        mine.addAll(nav.findPath(_pos(a), _pos(b)).map(nav.worldToGrid));
       }
+      catCells.addAll(mine);
+      catCellSets.add(mine);
       cats.add(CatConfig(
         id: 'cat_${level}_$i',
         patrolWaypoints: waypoints.map((p) => [p.x, p.y]).toList(),
@@ -226,9 +232,45 @@ class LevelGenerator {
     }
 
     // ------------------------------------------------------------------
-    // 5. Cheese, power-ups, crates and traps (each checked for fairness)
+    // 5. Extra mechanics: locked house (key) and/or a gate with a wall button
     // ------------------------------------------------------------------
-    final shuffled = [...floor]..shuffle(rand);
+    int gap(GridPoint a, GridPoint b) => (a.x - b.x).abs() + (a.y - b.y).abs();
+    final mech = LevelMechanics.forLevel(
+      level,
+      hard: diff == LevelDifficulty.hard,
+      medium: diff == LevelDifficulty.medium,
+    );
+    final catWaypoints = [for (final c in cats) for (final wp in c.patrolWaypoints) GridPoint(wp[0], wp[1])];
+
+    GridPoint? gateCell;
+    var region = distFromSpawn.keys.toSet();
+    if (mech.gate) {
+      final routeLen0 = solutionCells.length;
+      final candidates = <GridPoint>[
+        for (int i = (routeLen0 * 0.62).round(); i < (routeLen0 * 0.92).round(); i++)
+          if (!catCells.contains(solutionCells[i]) &&
+              gap(solutionCells[i], houseG) >= 2 &&
+              catWaypoints.every((c) => gap(c, solutionCells[i]) >= 3))
+            solutionCells[i],
+      ]..shuffle(rand);
+      for (final c in candidates) {
+        grid[c.y][c.x] = false;
+        final closed = _bfs(grid, spawnG);
+        grid[c.y][c.x] = true;
+        // The gate must really block the way to the house, with room left to explore.
+        if (!closed.containsKey(houseG) && closed.length > 20 && catWaypoints.every(closed.containsKey)) {
+          gateCell = c;
+          region = closed.keys.toSet();
+          break;
+        }
+      }
+      if (gateCell == null) return null;
+    }
+
+    // ------------------------------------------------------------------
+    // 6. Cheese, key, button, power-ups, crates, traps (all verified)
+    // ------------------------------------------------------------------
+    final shuffled = [...floor.where(region.contains)]..shuffle(rand);
     GridPoint? take(bool Function(GridPoint) ok) {
       for (final p in shuffled) {
         if (!used.contains(p) && ok(p)) {
@@ -239,15 +281,15 @@ class LevelGenerator {
       return null;
     }
 
-    int gap(GridPoint a, GridPoint b) => (a.x - b.x).abs() + (a.y - b.y).abs();
-    final catWaypoints = [for (final c in cats) for (final wp in c.patrolWaypoints) GridPoint(wp[0], wp[1])];
-    // Every collectible keeps clear of the spawn, the house, cat waypoints and other items.
-    final items = <GridPoint>[spawnG, houseG];
+    final items = <GridPoint>[spawnG, houseG, ?gateCell];
+    if (gateCell != null) used.add(gateCell);
     bool clear(GridPoint p, {int itemGap = 2}) =>
         items.every((o) => gap(o, p) >= itemGap) && catWaypoints.every((o) => gap(o, p) >= 2);
 
-    /// Picks the candidate that is farthest (in steps) from everything already placed,
-    /// so items spread over the whole map instead of clumping.
+    final total = distFromSpawn[houseG]!;
+    // How many steps off the shortest spawn-to-house route a cell is.
+    int detour(GridPoint p) => (distFromSpawn[p] ?? 999) + (distFromHouse[p] ?? 999) - total;
+
     GridPoint? pickSpread(bool Function(GridPoint) ok) {
       GridPoint? best;
       var bestScore = -1;
@@ -266,50 +308,223 @@ class LevelGenerator {
       return best;
     }
 
-    // Cheese: one on the main route (mid-way), two in dead ends spread across the map.
-    final cheese = <GridPoint>[];
+    // Distance (in tiles) from a cell to the nearest cat patrol cell.
+    double toCats(GridPoint p) {
+      var best = 999.0;
+      for (final c in catCells) {
+        final dx = (c.x - p.x).toDouble(), dy = (c.y - p.y).toDouble();
+        best = math.min(best, math.sqrt(dx * dx + dy * dy));
+      }
+      return best;
+    }
+
+    // Collectibles stay outside the cats radar when possible, so the cheese and
+    // key are a planning puzzle, not an unavoidable catch.
+    final radarSafe = visionTiles - 0.4;
+
     final routeLen = solutionCells.length;
+
+    // ------------------------------------------------------------------
+    // Power-ups are placed by WALKING TIME, not by straight-line distance.
+    // The mouse covers ~4.5 tiles/s (about 3.6 with turns), so an orb must
+    // sit a few steps before a cat's real line of sight, and the cat's whole
+    // zone must be crossable while the effect lasts.
+    // ------------------------------------------------------------------
+    const stepsPerSecond = 3.6;
+
+    /// Straight line of sight between two cells (walls block it).
+    bool seesCell(GridPoint a, GridPoint b) {
+      final dx = (b.x - a.x).toDouble(), dy = (b.y - a.y).toDouble();
+      final n = math.max(1, (math.sqrt(dx * dx + dy * dy) * 4).ceil());
+      for (int s = 0; s <= n; s++) {
+        final x = (a.x + 0.5 + dx * s / n).floor(), y = (a.y + 0.5 + dy * s / n).floor();
+        if (!grid[y][x]) return false;
+      }
+      return true;
+    }
+
+    /// True when a cat of [cat] could actually see this cell from its patrol.
+    bool exposedTo(int cat, GridPoint p) {
+      for (final c in catCellSets[cat]) {
+        final dx = (c.x - p.x).toDouble(), dy = (c.y - p.y).toDouble();
+        if (dx * dx + dy * dy <= visionTiles * visionTiles && seesCell(c, p)) return true;
+      }
+      return false;
+    }
+
+    bool exposedAny(GridPoint p) {
+      for (int c = 0; c < catCellSets.length; c++) {
+        if (exposedTo(c, p)) return true;
+      }
+      return false;
+    }
+
+    int firstExposed(int cat) {
+      for (int k = 0; k < routeLen; k++) {
+        if (exposedTo(cat, solutionCells[k])) return k;
+      }
+      return -1;
+    }
+
+    int lastExposed(int cat) {
+      for (int k = routeLen - 1; k >= 0; k--) {
+        if (exposedTo(cat, solutionCells[k])) return k;
+      }
+      return -1;
+    }
+
+    final kinds = PowerUpKind.values.where((k) => level >= k.introducedAt).toList();
+    final powerUps = <PowerUpPlacement>[];
+    final powerCats = <int>[]; // which cat each power-up is meant for
+    final count = kinds.isEmpty ? 0 : (diff == LevelDifficulty.easy ? 1 : 2);
+    final newKind = kinds.where((k) => k.introducedAt == level);
+
+    final catOrder = List.generate(cats.length, (i) => i)..sort((a, b) => firstExposed(a).compareTo(firstExposed(b)));
+    for (int i = 0; i < count && cats.isNotEmpty; i++) {
+      final unused = kinds.where((k) => powerUps.every((p) => p.kind != k)).toList();
+      final pool = unused.isEmpty ? kinds : unused;
+      final kind = i == 0 && newKind.isNotEmpty ? newKind.first : pool[rand.nextInt(pool.length)];
+      final cat = catOrder[i % catOrder.length];
+      final entry = firstExposed(cat), exit = lastExposed(cat);
+      if (entry < 1) continue;
+      final budget = kind.duration * stepsPerSecond; // steps walkable while it lasts
+      GridPoint? spot;
+      for (final lead in [3, 4, 2, 5, 6, 8]) {
+        final k = entry - lead;
+        if (k < 1) continue;
+        final p = solutionCells[k];
+        if (!region.contains(p) || used.contains(p) || catCells.contains(p) || !clear(p, itemGap: 2)) continue;
+        if (nearSpawn(p, 3) || exposedAny(p)) continue;
+        // Freeze and ghost must outlast the walk across the cat's whole zone.
+        if (kind != PowerUpKind.speed && exit - k > budget * 0.8) continue;
+        spot = p;
+        break;
+      }
+      if (spot == null) continue;
+      used.add(spot);
+      items.add(spot);
+      powerUps.add(PowerUpPlacement(kind, _pos(spot)));
+      powerCats.add(cat);
+    }
+    if (kinds.isNotEmpty && powerUps.isEmpty) return null;
+
+    // Guarded cheese: with a freeze orb, one cheese sits INSIDE that cat's zone,
+    // close enough to grab and leave before the ice melts.
+    final cheese = <GridPoint>[];
+    final freezeIdx = powerUps.indexWhere((p) => p.kind == PowerUpKind.freeze);
+    if (freezeIdx >= 0) {
+      final cat = powerCats[freezeIdx];
+      final orbCell = nav.worldToGrid(powerUps[freezeIdx].position);
+      final fromOrb = _bfs(grid, orbCell);
+      final reachBudget = PowerUpKind.freeze.duration * stepsPerSecond * 0.7;
+      GridPoint? best;
+      var bestD = 999;
+      for (final p in shuffled) {
+        if (used.contains(p) || catCells.contains(p) || !clear(p, itemGap: 2)) continue;
+        final d = fromOrb[p];
+        if (d == null || d < 4 || d > reachBudget * 0.75 || detour(p) > 6) continue;
+        if (!exposedTo(cat, p)) continue; // really inside the guarded zone
+        var nearestPatrol = 999.0;
+        for (final c in catCellSets[cat]) {
+          final dx = (c.x - p.x).toDouble(), dy = (c.y - p.y).toDouble();
+          nearestPatrol = math.min(nearestPatrol, math.sqrt(dx * dx + dy * dy));
+        }
+        if (nearestPatrol < 1.5) continue; // not right on the cat's path
+        if (d < bestD) {
+          bestD = d;
+          best = p;
+        }
+      }
+      if (best != null) {
+        used.add(best);
+        items.add(best);
+        cheese.add(best);
+      }
+    }
+
+    // Cheese: one right on the route, two a short detour away (never far side pockets).
     final routeCheese = take((p) {
       final i = solutionCells.indexOf(p);
-      return i > routeLen * 0.3 && i < routeLen * 0.65 && clear(p, itemGap: 5);
+      return i > routeLen * 0.25 && i < routeLen * 0.6 && clear(p, itemGap: 5) && toCats(p) > radarSafe;
     });
     if (routeCheese != null) {
       cheese.add(routeCheese);
       items.add(routeCheese);
     }
-    while (cheese.length < 3) {
-      final c = pickSpread((p) => _isDeadEnd(grid, p) && clear(p, itemGap: 5)) ??
-          pickSpread((p) => clear(p, itemGap: 5));
-      if (c == null) return null;
-      cheese.add(c);
+    for (final (maxDetour, strict) in [(10, true), (14, true), (18, true), (14, false), (18, false)]) {
+      bool outside(GridPoint p) => !strict || toCats(p) > radarSafe;
+      while (cheese.length < 3) {
+        final c = pickSpread((p) => detour(p) >= 2 && detour(p) <= maxDetour && _isDeadEnd(grid, p) && clear(p, itemGap: 5)) ??
+            pickSpread((p) => detour(p) >= 2 && detour(p) <= maxDetour && clear(p, itemGap: 5) && outside(p));
+        if (c == null) break;
+        cheese.add(c);
+      }
+    }
+    if (cheese.length < 3) return null;
+
+    // Key: a short detour off the route, away from the cats.
+    GridPoint? keyCell;
+    if (mech.lockedHouse) {
+      for (final strict in [true, false]) {
+        keyCell ??= pickSpread((p) =>
+            detour(p) >= 4 && detour(p) <= 10 && clear(p, itemGap: 4) && !catCells.contains(p) && (!strict || toCats(p) > radarSafe));
+      }
+      if (keyCell == null) return null;
     }
 
-    // Power-ups: on the first half of the journey so they help before the cats.
-    final kinds = PowerUpKind.values.where((k) => level >= k.introducedAt).toList();
-    final powerUps = <PowerUpPlacement>[];
-    final count = kinds.isEmpty ? 0 : (diff == LevelDifficulty.easy ? 1 : 2);
-    final newKind = kinds.where((k) => k.introducedAt == level);
-    final total = distFromSpawn[houseG]!;
-    for (int i = 0; i < count; i++) {
-      final unused = kinds.where((k) => powerUps.every((p) => p.kind != k)).toList();
-      final pool = unused.isEmpty ? kinds : unused;
-      final kind = i == 0 && newKind.isNotEmpty ? newKind.first : pool[rand.nextInt(pool.length)];
-      final p = pickSpread((p) {
-        final d = distFromSpawn[p] ?? 0;
-        return d >= 4 && d <= total * 0.6 && !_isDeadEnd(grid, p) && !catCells.contains(p) && clear(p, itemGap: 3);
-      });
-      if (p != null) powerUps.add(PowerUpPlacement(kind, _pos(p)));
+    // Wall button: right ON the main route, shortly before the gate, near (but
+    // outside) a cat zone, so pressing it is a timing decision, never a long detour.
+    GatePlacement? gatePlacement;
+    GridPoint? pressCell;
+    if (gateCell != null) {
+      for (final band in [(0.28, 0.58), (0.15, 0.62)]) {
+        GridPoint? best;
+        var bestScore = 1e9;
+        for (int k = (routeLen * band.$1).round(); k < (routeLen * band.$2).round() && k < routeLen; k++) {
+          final p = solutionCells[k];
+          if (!region.contains(p) || used.contains(p) || catCells.contains(p) || !clear(p, itemGap: 3)) continue;
+          if (_interiorWallNeighbour(grid, p) == null || toCats(p) <= radarSafe) continue;
+          final score = (toCats(p) - (radarSafe + 2.5)).abs();
+          if (score < bestScore) {
+            bestScore = score;
+            best = p;
+          }
+        }
+        if (best != null) {
+          pressCell = best;
+          break;
+        }
+      }
+      if (pressCell == null) return null;
+      used.add(pressCell);
+      items.add(pressCell);
+      final wall = _interiorWallNeighbour(grid, pressCell)!;
+      gatePlacement = GatePlacement(
+        gate: _pos(gateCell),
+        switchWall: _pos(wall),
+        pressSpot: _pos(pressCell),
+      );
     }
+
 
     final obstacles = <ObstaclePlacement>[];
     final blocked = grid.map((r) => r.map((c) => !c).toList()).toList();
     final traps = <GridPoint>{};
-    final mustReach = [houseG, ...cheese, ...powerUps.map((p) => nav.worldToGrid(p.position))];
+    final mustReach = [
+      ...cheese,
+      ...powerUps.map((p) => nav.worldToGrid(p.position)),
+      ?keyCell,
+      ?pressCell,
+    ];
 
-    /// Everything reachable, and reachable WITHOUT touching a trap.
+    /// Everything reachable without touching a trap; the house too once the gate is open.
     bool fair() {
-      final safe = _bfs(grid, spawnG, blocked: blocked, avoid: traps);
-      return mustReach.every(safe.containsKey);
+      if (gateCell != null) blocked[gateCell.y][gateCell.x] = true;
+      final closed = _bfs(grid, spawnG, blocked: blocked, avoid: traps);
+      if (gateCell != null) blocked[gateCell.y][gateCell.x] = false;
+      if (!mustReach.every(closed.containsKey)) return false;
+      final open = _bfs(grid, spawnG, blocked: blocked, avoid: traps);
+      return open.containsKey(houseG);
     }
 
     // Crates: cover to hide behind (from level 6), off the main route.
@@ -325,13 +540,13 @@ class LevelGenerator {
       }
     }
 
-    // Traps (from level 4): placed ON the main route where a detour exists, so
-    // they force a smarter path, but never next to items and never clustered.
+    // Traps (from level 4): on the main route where a detour exists, never
+    // beside items or each other.
     final trapCount = level < 4 ? 0 : math.min(1 + level ~/ 10, 8) + (diff == LevelDifficulty.hard ? 2 : 0);
     bool trapOk(GridPoint p) =>
         !catCells.contains(p) && clear(p) && traps.every((o) => gap(o, p) >= 3) && !nearSpawn(p, 3);
     final routeSpots = [...solutionCells.sublist((routeLen * 0.2).round(), (routeLen * 0.9).round())]..shuffle(rand);
-    for (final p in [...routeSpots, ...shuffled]) {
+    for (final p in [...routeSpots.where(region.contains), ...shuffled]) {
       if (traps.length >= trapCount) break;
       if (used.contains(p) || !trapOk(p)) continue;
       traps.add(p);
@@ -344,7 +559,12 @@ class LevelGenerator {
     }
 
     final hintPath = nav.findPath(_pos(spawnG), _pos(houseG), avoid: traps);
-    final time = (hintPath.length * 1.1 + 30 + diff.catCount * 8).round();
+    final time = (hintPath.length * 1.1 +
+            30 +
+            diff.catCount * 8 +
+            (keyCell != null ? 14 : 0) +
+            (gateCell != null ? 14 : 0))
+        .round();
 
     return MazeLevelData(
       levelNumber: level,
@@ -368,7 +588,19 @@ class LevelGenerator {
         LevelDifficulty.medium => 2,
         LevelDifficulty.hard => 3,
       },
+      gate: gatePlacement,
+      keyPosition: keyCell == null ? null : _pos(keyCell),
     );
+  }
+
+  /// An inner (breakable, non-border) wall tile touching [p], for the wall button.
+  static GridPoint? _interiorWallNeighbour(List<List<bool>> grid, GridPoint p) {
+    final h = grid.length, w = grid.first.length;
+    for (final d in const [GridPoint(1, 0), GridPoint(-1, 0), GridPoint(0, 1), GridPoint(0, -1)]) {
+      final n = GridPoint(p.x + d.x, p.y + d.y);
+      if (n.x > 0 && n.y > 0 && n.x < w - 1 && n.y < h - 1 && !grid[n.y][n.x]) return n;
+    }
+    return null;
   }
 
   static bool _isDeadEnd(List<List<bool>> grid, GridPoint p) {

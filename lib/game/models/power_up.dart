@@ -20,9 +20,9 @@ class PowerUpPlacement {
 
 extension PowerUpInfo on PowerUpKind {
   double get duration => switch (this) {
-        PowerUpKind.freeze => 4.0,
+        PowerUpKind.freeze => 6.0,
         PowerUpKind.speed => 5.0,
-        PowerUpKind.ghost => 5.0,
+        PowerUpKind.ghost => 6.0,
       };
 
   String get label => switch (this) {

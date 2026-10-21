@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/cosmetics_service.dart';
 import '../models/power_up.dart';
+import 'mechanic_components.dart';
 import 'procedural_painter.dart';
 
 class CodeMouseComponent extends PositionComponent {
@@ -121,6 +122,7 @@ class CodeMouseComponent extends PositionComponent {
 class CodeHouseComponent extends PositionComponent {
   final Vector2 destinationPoint;
   double _animTimer = 0.0;
+  bool locked = false; // needs the key before the mouse can go in
 
   CodeHouseComponent({
     required Vector2 position,
@@ -147,6 +149,9 @@ class CodeHouseComponent extends PositionComponent {
       animTimer: _animTimer,
       skinId: skinId,
     );
+    if (locked) {
+      drawPadlock(canvas, Offset(size.x / 2, size.y * 0.62), 1.05);
+    }
   }
 }
 

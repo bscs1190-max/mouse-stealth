@@ -5,6 +5,8 @@ class ProgressService {
 
   int totalCheeseCurrency = 0;
   int highestUnlockedLevel = 1;
+  bool tutorialSeen = false; // the first-level guide is shown until finished or skipped
+  bool moveGuideDone = false; // the on-map hand guide of level 1 has been completed
   final Map<int, int> levelStars = {};
 
   void addCheese(int count) {

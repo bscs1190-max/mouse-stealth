@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../game/models/game_state.dart';
 import '../game/models/power_up.dart';
 import '../game/services/level_repository.dart';
+import 'demo/demo_scene.dart';
 import 'theme/app_theme.dart';
 import 'widgets/game_ui.dart';
 
@@ -16,16 +17,15 @@ class HudMetrics {
 class HudOverlay extends StatelessWidget {
   final MazeLevelData levelData;
   final GameSessionState session;
-  final double currentZoom;
   final bool spotted;
   final String? lifeLostMessage;
   final String? toastMessage;
   final Map<PowerUpKind, double> activeEffects;
   final int hammerCharges;
   final bool breakMode;
-  final VoidCallback onZoomIn;
-  final VoidCallback onZoomOut;
-  final VoidCallback onResetZoom;
+  final bool? keyCollected; // null: this level has no key
+  final bool? gateOpen; // null: this level has no gate
+  final VoidCallback onFitPressed;
   final VoidCallback onHintPressed;
   final VoidCallback onResetPressed;
   final VoidCallback onBackPressed;
@@ -35,10 +35,8 @@ class HudOverlay extends StatelessWidget {
     super.key,
     required this.levelData,
     required this.session,
-    required this.currentZoom,
-    required this.onZoomIn,
-    required this.onZoomOut,
-    required this.onResetZoom,
+
+    required this.onFitPressed,
     required this.onHintPressed,
     required this.onResetPressed,
     required this.onBackPressed,
@@ -46,6 +44,8 @@ class HudOverlay extends StatelessWidget {
     required this.hammerCharges,
     this.breakMode = false,
     this.activeEffects = const {},
+    this.keyCollected,
+    this.gateOpen,
     this.spotted = false,
     this.lifeLostMessage,
     this.toastMessage,
@@ -135,49 +135,84 @@ class HudOverlay extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _Pill(
-                      borderColor: AppColors.coral.withValues(alpha: 0.6),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(session.maxHearts, (i) {
-                          final alive = i < session.hearts;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 1),
-                            child: Icon(
-                              alive ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                              size: 18,
-                              color: alive ? AppColors.coral : AppColors.textFaint,
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _Pill(
+                              borderColor: AppColors.coral.withValues(alpha: 0.6),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: List.generate(session.maxHearts, (i) {
+                                  final alive = i < session.hearts;
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 1),
+                                    child: Icon(
+                                      alive ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                      size: 18,
+                                      color: alive ? AppColors.coral : AppColors.textFaint,
+                                    ),
+                                  );
+                                }),
+                              ),
                             ),
-                          );
-                        }),
+                            const SizedBox(width: 6),
+                            _Pill(
+                              borderColor: AppColors.cheese.withValues(alpha: 0.6),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('🧀', style: TextStyle(fontSize: 14)),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '${session.collectedCheese}/${session.totalCheese}',
+                                    style: AppText.number(14, color: AppColors.cheese),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            _Pill(
+                              borderColor: AppColors.textFaint.withValues(alpha: 0.6),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('🐱', style: TextStyle(fontSize: 14)),
+                                  const SizedBox(width: 4),
+                                  Text('${levelData.cats.length}', style: AppText.number(14)),
+                                ],
+                              ),
+                            ),
+                            if (keyCollected != null) ...[
+                              const SizedBox(width: 6),
+                              _Pill(
+                                borderColor: (keyCollected! ? AppColors.mint : AppColors.cheese).withValues(alpha: 0.7),
+                                child: Icon(
+                                  keyCollected! ? Icons.lock_open_rounded : Icons.vpn_key_rounded,
+                                  size: 16,
+                                  color: keyCollected! ? AppColors.mint : AppColors.cheese,
+                                ),
+                              ),
+                            ],
+                            if (gateOpen != null) ...[
+                              const SizedBox(width: 6),
+                              _Pill(
+                                borderColor: (gateOpen! ? AppColors.mint : AppColors.violet).withValues(alpha: 0.7),
+                                child: Icon(
+                                  gateOpen! ? Icons.meeting_room_rounded : Icons.fence_rounded,
+                                  size: 16,
+                                  color: gateOpen! ? AppColors.mint : AppColors.violet,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
-                    _Pill(
-                      borderColor: AppColors.cheese.withValues(alpha: 0.6),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('🧀', style: TextStyle(fontSize: 14)),
-                          const SizedBox(width: 5),
-                          Text('${session.collectedCheese}/${session.totalCheese}',
-                              style: AppText.number(14, color: AppColors.cheese)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    _Pill(
-                      borderColor: AppColors.textFaint.withValues(alpha: 0.6),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('🐱', style: TextStyle(fontSize: 14)),
-                          const SizedBox(width: 4),
-                          Text('${levelData.cats.length}', style: AppText.number(14)),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
                     if (time != null)
                       _Pill(
                         color: isTimeLow ? AppColors.coralDeep.withValues(alpha: 0.85) : null,
@@ -215,9 +250,7 @@ class HudOverlay extends StatelessWidget {
                     Wrap(
                       spacing: 6,
                       alignment: WrapAlignment.center,
-                      children: [
-                        for (final e in activeEffects.entries) _EffectChip(kind: e.key, secondsLeft: e.value),
-                      ],
+                      children: [for (final e in activeEffects.entries) _EffectChip(kind: e.key, secondsLeft: e.value)],
                     ),
                   ],
                 ],
@@ -244,16 +277,15 @@ class HudOverlay extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                GlassCard(
-                  radius: 18,
-                  padding: const EdgeInsets.all(4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _MiniButton(icon: Icons.remove_rounded, tooltip: 'Zoom out', onTap: onZoomOut),
-                      const SizedBox(width: 4),
-                      _MiniButton(icon: Icons.add_rounded, tooltip: 'Zoom in', onTap: onZoomIn),
-                    ],
+                Tooltip(
+                  message: 'Show whole map',
+                  child: GestureDetector(
+                    onTap: onFitPressed,
+                    child: const GlassCard(
+                      radius: 18,
+                      padding: EdgeInsets.all(13),
+                      child: Icon(Icons.fit_screen_rounded, color: AppColors.text, size: 24),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -278,15 +310,34 @@ class HudOverlay extends StatelessWidget {
 }
 
 /// Card shown before a level starts.
-class LevelIntroCard extends StatelessWidget {
+class LevelIntroCard extends StatefulWidget {
   final MazeLevelData levelData;
   final List<String> notes;
+  final List<DemoKind> demos; // short looping demos of things new in this level
   final VoidCallback onStart;
 
-  const LevelIntroCard({super.key, required this.levelData, required this.notes, required this.onStart});
+  const LevelIntroCard({
+    super.key,
+    required this.levelData,
+    required this.notes,
+    required this.onStart,
+    this.demos = const [],
+  });
+
+  @override
+  State<LevelIntroCard> createState() => _LevelIntroCardState();
+}
+
+class _LevelIntroCardState extends State<LevelIntroCard> {
+  int _demoPage = 0;
 
   @override
   Widget build(BuildContext context) {
+    final levelData = widget.levelData;
+    final notes = widget.notes;
+    final demos = widget.demos;
+    final onStart = widget.onStart;
+
     final color = difficultyColor(levelData.difficultyTag);
     final powerUps = levelData.powerUps.map((p) => p.kind).toSet();
     return Center(
@@ -322,6 +373,50 @@ class LevelIntroCard extends StatelessWidget {
                     for (final k in powerUps) _InfoChip(icon: k.emoji, text: k.label),
                   ],
                 ),
+                if (demos.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'NEW IN THIS LEVEL',
+                      style: AppText.body(11.5, color: AppColors.mint).copyWith(letterSpacing: 2),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 262,
+                    child: PageView.builder(
+                      itemCount: demos.length,
+                      onPageChanged: (i) => setState(() => _demoPage = i),
+                      itemBuilder: (context, i) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          DemoView(kind: demos[i], height: 130),
+                          const SizedBox(height: 8),
+                          Text(demos[i].title, style: AppText.title(16)),
+                          const SizedBox(height: 2),
+                          Text(demos[i].caption, style: AppText.body(12.5)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (demos.length > 1)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        for (int i = 0; i < demos.length; i++)
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: i == _demoPage ? 18 : 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: i == _demoPage ? AppColors.mint : AppColors.outline,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
                 if (notes.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   for (final n in notes)
@@ -399,7 +494,10 @@ class _EffectChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: c, width: 1.5),
       ),
-      child: Text('${kind.emoji} ${kind.label} ${secondsLeft.ceil()}s', style: AppText.title(12.5, color: Colors.white)),
+      child: Text(
+        '${kind.emoji} ${kind.label} ${secondsLeft.ceil()}s',
+        style: AppText.title(12.5, color: Colors.white),
+      ),
     );
   }
 }
@@ -445,32 +543,10 @@ class _Banner extends StatelessWidget {
         children: [
           Icon(icon, color: Colors.white, size: 17),
           const SizedBox(width: 7),
-          Flexible(child: Text(text, style: AppText.title(13.5), overflow: TextOverflow.ellipsis)),
+          Flexible(
+            child: Text(text, style: AppText.title(13.5), overflow: TextOverflow.ellipsis),
+          ),
         ],
-      ),
-    );
-  }
-}
-
-class _MiniButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  const _MiniButton({required this.icon, required this.tooltip, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, color: AppColors.text, size: 20),
-        ),
       ),
     );
   }
