@@ -1,7 +1,9 @@
 import 'dart:math' as math;
+
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
+import '../../ui/art/night_art.dart';
 import '../models/theme_config.dart';
 
 class ForestBackgroundComponent extends Component with HasGameRef {
@@ -23,17 +25,17 @@ class ForestBackgroundComponent extends Component with HasGameRef {
     final w = size.x;
     final h = size.y;
 
-    // 1. Dynamic Tier Background Gradient
-    final bgPaint = Paint()
-      ..shader = RadialGradient(
-        colors: theme.bgGradient,
-        center: const Alignment(0.0, -0.1),
-        radius: 1.1,
-      ).createShader(Rect.fromLTWH(0, 0, w, h));
-    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), bgPaint);
-
-    // 2. Distant Railroad tracks in upper-right
-    _drawTracks(canvas, w - 80, 20, 90, 80);
+    // 1. Night sky tinted by the world theme: darkest at the top, lighter toward the horizon.
+    final g = theme.bgGradient;
+    NightArt.sky(
+      canvas,
+      Size(w, h),
+      _animTimer,
+      top: g.length > 2 ? g[2] : g.last,
+      mid: g[1],
+      bottom: g.first,
+      moon: true,
+    );
 
     // 3. Ambient pine trees themed by world tier
     _drawPineTree(canvas, 10, h * 0.18, 38, 70);
@@ -49,6 +51,9 @@ class ForestBackgroundComponent extends Component with HasGameRef {
     _drawLanternPost(canvas, 24, h * 0.58, _animTimer + 1.2);
     _drawLanternPost(canvas, w - 24, h * 0.38, _animTimer + 0.6);
     _drawLanternPost(canvas, w - 24, h * 0.65, _animTimer + 1.8);
+
+    NightArt.particles(canvas, Size(w, h), _animTimer);
+    NightArt.vignette(canvas, Size(w, h), strength: 0.55);
   }
 
   void _drawPineTree(Canvas canvas, double cx, double cy, double width, double height) {
@@ -103,24 +108,5 @@ class ForestBackgroundComponent extends Component with HasGameRef {
     capPath.lineTo(cx + 8, cy - 10);
     capPath.close();
     canvas.drawPath(capPath, Paint()..color = const Color(0xFF1E2430));
-  }
-
-  void _drawTracks(Canvas canvas, double x, double y, double w, double h) {
-    final trackPaint = Paint()
-      ..color = const Color(0xFF232D3F)
-      ..strokeWidth = 2.0;
-
-    canvas.drawLine(Offset(x, y + 10), Offset(x + w, y + h - 10), trackPaint);
-    canvas.drawLine(Offset(x + 12, y), Offset(x + w + 12, y + h - 20), trackPaint);
-
-    final tiePaint = Paint()
-      ..color = const Color(0xFF3B2816)
-      ..strokeWidth = 3.0;
-    for (int i = 0; i < 5; i++) {
-      final t = i / 4.0;
-      final tx = x + w * t;
-      final ty = y + h * t;
-      canvas.drawLine(Offset(tx - 6, ty + 8), Offset(tx + 14, ty - 8), tiePaint);
-    }
   }
 }

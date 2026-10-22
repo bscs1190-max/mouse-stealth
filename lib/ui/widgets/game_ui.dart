@@ -1,54 +1,89 @@
 import 'package:flutter/material.dart';
 
+import '../art/night_art.dart';
 import '../theme/app_theme.dart';
 
-/// Full-screen gradient backdrop with soft glowing orbs.
-class GameBackground extends StatelessWidget {
+/// Full-screen night backdrop: gradient sky with twinkling stars, a glowing moon,
+/// drifting clouds, falling leaves and a dark vignette. Pass [top]/[bottom] to
+/// retint a screen (red for defeat, blue for rewards...).
+class GameBackground extends StatefulWidget {
   final Widget child;
-  const GameBackground({super.key, required this.child});
+  final Color top;
+  final Color bottom;
+  final bool? moon;
+  final bool particles;
+
+  const GameBackground({
+    super.key,
+    required this.child,
+    this.top = const Color(0xFF070B2A),
+    this.bottom = const Color(0xFF1F4A6B),
+    this.moon,
+    this.particles = true,
+    // Kept so older call sites compile; the night sky has no tiles.
+    double tileSize = 0,
+  });
+
+  @override
+  State<GameBackground> createState() => _GameBackgroundState();
+}
+
+class _GameBackgroundState extends State<GameBackground> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(seconds: 90))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.bgTop, AppColors.bgBottom],
+    final isDefault = widget.top == const Color(0xFF070B2A);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        RepaintBoundary(
+          child: AnimatedBuilder(
+            animation: _c,
+            builder: (context, _) => CustomPaint(
+              painter: _NightBackdropPainter(
+                t: _c.value * 90,
+                top: widget.top,
+                bottom: widget.bottom,
+                moon: widget.moon ?? isDefault,
+                particles: widget.particles,
+              ),
+            ),
+          ),
         ),
-      ),
-      child: Stack(
-        children: [
-          const Positioned(top: -80, left: -60, child: _Orb(220, AppColors.violet)),
-          const Positioned(top: 180, right: -90, child: _Orb(200, AppColors.mint)),
-          const Positioned(bottom: -70, left: 40, child: _Orb(240, AppColors.cheeseDeep)),
-          Positioned.fill(child: child),
-        ],
-      ),
+        Positioned.fill(child: widget.child),
+      ],
     );
   }
 }
 
-class _Orb extends StatelessWidget {
-  final double size;
-  final Color color;
-  const _Orb(this.size, this.color);
+class _NightBackdropPainter extends CustomPainter {
+  final double t;
+  final Color top, bottom;
+  final bool moon, particles;
+  _NightBackdropPainter({required this.t, required this.top, required this.bottom, required this.moon, required this.particles});
 
   @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color.withValues(alpha: 0.22), color.withValues(alpha: 0.0)],
-          ),
-        ),
-      ),
-    );
+  void paint(Canvas canvas, Size s) {
+    NightArt.sky(canvas, s, t, top: top, mid: Color.lerp(top, bottom, 0.55)!, bottom: bottom, moon: moon);
+    if (particles) NightArt.particles(canvas, s, t);
+    NightArt.vignette(canvas, s, strength: 0.5);
   }
+
+  @override
+  bool shouldRepaint(covariant _NightBackdropPainter old) => old.t != t || old.top != top || old.bottom != bottom;
 }
 
 /// Translucent rounded panel used for cards and HUD pieces.
@@ -76,9 +111,7 @@ class GlassCard extends StatelessWidget {
         color: color ?? AppColors.surface.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: borderColor ?? AppColors.outline.withValues(alpha: 0.7), width: 1.5),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8)),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8))],
       ),
       child: child,
     );

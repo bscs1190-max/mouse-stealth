@@ -14,15 +14,11 @@ import '../ui/demo/demo_scene.dart';
 import '../ui/game_over_dialog.dart';
 import '../ui/hud_overlay.dart';
 import '../ui/level_complete_dialog.dart';
-import '../ui/tutorial_overlay.dart';
 
 class GameScreen extends StatefulWidget {
   final int levelNumber;
 
-  const GameScreen({
-    super.key,
-    required this.levelNumber,
-  });
+  const GameScreen({super.key, required this.levelNumber});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -40,10 +36,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _initGame() {
-    _game = MouseHouseGame(
-      levelNumber: currentLevel,
-      onStateChanged: _refresh,
-    );
+    _game = MouseHouseGame(levelNumber: currentLevel, onStateChanged: _refresh);
   }
 
   bool _refreshQueued = false;
@@ -118,7 +111,8 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _onPointerUp(PointerUpEvent e) {
-    final isTap = _tapPointer == e.pointer &&
+    final isTap =
+        _tapPointer == e.pointer &&
         !_dragging &&
         _pointers.length == 1 &&
         DateTime.now().difference(_downTime).inMilliseconds < 600;
@@ -153,9 +147,7 @@ class _GameScreenState extends State<GameScreen> {
         _initGame();
       });
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🎉 You conquered all 100 levels!')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🎉 You conquered all 100 levels!')));
       Navigator.of(context).pop();
     }
   }
@@ -214,14 +206,7 @@ class _GameScreenState extends State<GameScreen> {
             ),
           ),
 
-          if (status == GameStatus.paused && currentLevel == 1 && !ProgressService().tutorialSeen)
-            TutorialOverlay(
-              onDone: () {
-                ProgressService().tutorialSeen = true;
-                _game.startLevel();
-              },
-            )
-          else if (status == GameStatus.paused)
+          if (status == GameStatus.paused)
             SafeArea(
               child: LevelIntroCard(
                 levelData: _game.levelData,
@@ -233,6 +218,9 @@ class _GameScreenState extends State<GameScreen> {
 
           if (status == GameStatus.success)
             LevelCompleteDialog(
+              key: ValueKey('complete$currentLevel'),
+              level: currentLevel,
+              worldName: _game.levelData.theme.name,
               stars: ScoringSystem.calculateStars(
                 reachedHouse: true,
                 collectedCheese: session!.collectedCheese,
@@ -242,6 +230,8 @@ class _GameScreenState extends State<GameScreen> {
               ),
               collectedCheese: session.collectedCheese,
               totalCheese: session.totalCheese,
+              heartsLeft: session.hearts,
+              cheeseBank: ProgressService().totalCheeseCurrency,
               onReplay: _game.resetLevel,
               onNextLevel: _loadNextLevel,
             ),

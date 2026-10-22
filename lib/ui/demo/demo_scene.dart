@@ -8,53 +8,39 @@ import '../../game/rendering/mechanic_components.dart';
 import '../../game/rendering/procedural_painter.dart';
 
 /// Things the player can be shown a looping mini-demo of.
-enum DemoKind {
-  goal,
-  tapMove,
-  radar,
-  zoomPan,
-  hammer,
-  trap,
-  crate,
-  freeze,
-  speed,
-  ghost,
-  key,
-  gate,
-}
+enum DemoKind { goal, tapMove, radar, zoomPan, hammer, trap, crate, freeze, speed, ghost, key, gate }
 
 extension DemoInfo on DemoKind {
   String get title => switch (this) {
-        DemoKind.goal => 'Reach the house',
-        DemoKind.tapMove => 'Tap to move',
-        DemoKind.radar => 'Dodge the cat radar',
-        DemoKind.zoomPan => 'Pinch and drag',
-        DemoKind.hammer => 'Smash a wall',
-        DemoKind.trap => 'Avoid the traps',
-        DemoKind.crate => 'Hide behind cover',
-        DemoKind.freeze => 'Freeze power-up',
-        DemoKind.speed => 'Speed power-up',
-        DemoKind.ghost => 'Ghost power-up',
-        DemoKind.key => 'Find the key',
-        DemoKind.gate => 'Open the gate',
-      };
+    DemoKind.goal => 'Reach the house',
+    DemoKind.tapMove => 'Tap to move',
+    DemoKind.radar => 'Dodge the cat radar',
+    DemoKind.zoomPan => 'Pinch and drag',
+    DemoKind.hammer => 'Smash a wall',
+    DemoKind.trap => 'Avoid the traps',
+    DemoKind.crate => 'Hide behind cover',
+    DemoKind.freeze => 'Freeze power-up',
+    DemoKind.speed => 'Speed power-up',
+    DemoKind.ghost => 'Ghost power-up',
+    DemoKind.key => 'Find the key',
+    DemoKind.gate => 'Open the gate',
+  };
 
   String get caption => switch (this) {
-        DemoKind.goal => 'Guide the mouse to the house. Grab the cheese on the way to earn stars.',
-        DemoKind.tapMove => 'Tap any tile and the mouse walks there by itself.',
-        DemoKind.radar =>
-          'A cat that sees you inside its radar chases you for a few seconds. Stay outside it, or hide behind walls.',
-        DemoKind.zoomPan => 'Pinch with two fingers to zoom. Drag with one finger to look around the map.',
-        DemoKind.hammer => 'Tap BREAK, then tap a wall or crate to smash it and open a new shortcut.',
-        DemoKind.trap => 'Traps cost a heart. Tap a tile and the mouse already walks around known traps.',
-        DemoKind.crate => 'Walls and crates block a cat\'s view. Hide behind them while the cat passes.',
-        DemoKind.freeze =>
-          'Grab the orb just before a cat. Every cat freezes in ice for 6 seconds: walk past it and grab the guarded cheese.',
-        DemoKind.speed => 'Grab the orb and the mouse runs much faster for 5 seconds. Outrun the chase.',
-        DemoKind.ghost => 'Grab the orb and cats cannot see or catch you for 6 seconds.',
-        DemoKind.key => 'The house is locked. Collect the golden key first, then go home.',
-        DemoKind.gate => 'A gate blocks the way. Tap the glowing wall button: the mouse presses it and the gate opens.',
-      };
+    DemoKind.goal => 'Guide the mouse to the house. Grab the cheese on the way to earn stars.',
+    DemoKind.tapMove => 'Tap any tile and the mouse walks there by itself.',
+    DemoKind.radar =>
+      'A cat that sees you inside its radar chases you for a few seconds. Stay outside it, or hide behind walls.',
+    DemoKind.zoomPan => 'Pinch with two fingers to zoom. Drag with one finger to look around the map.',
+    DemoKind.hammer => 'Tap BREAK, then tap a wall or crate to smash it and open a new shortcut.',
+    DemoKind.trap => 'Traps cost a heart. Tap a tile and the mouse already walks around known traps.',
+    DemoKind.crate => 'Walls and crates block a cat\'s view. Hide behind them while the cat passes.',
+    DemoKind.freeze => 'Grab the orb just before a cat. Every cat freezes in ice for 6 seconds: walk past it and grab the guarded cheese.',
+    DemoKind.speed => 'Grab the orb and the mouse runs much faster for 5 seconds. Outrun the chase.',
+    DemoKind.ghost => 'Grab the orb and cats cannot see or catch you for 6 seconds.',
+    DemoKind.key => 'The house is locked. Collect the golden key first, then go home.',
+    DemoKind.gate => 'A gate blocks the way. Tap the glowing wall button: the mouse presses it and the gate opens.',
+  };
 }
 
 /// Demos to show on a level's intro card: only things introduced in that level.
@@ -217,7 +203,9 @@ class _DemoPainter extends CustomPainter {
   }
 
   void _mouse(Canvas c, Offset p, {double alpha = 1, bool happy = false}) {
-    if (alpha < 1) c.saveLayer(Rect.fromCircle(center: p, radius: 24), Paint()..color = Colors.white.withValues(alpha: alpha));
+    if (alpha < 1) {
+      c.saveLayer(Rect.fromCircle(center: p, radius: 24), Paint()..color = Colors.white.withValues(alpha: alpha));
+    }
     _at(c, p, 28, (s) => ProceduralPainter.drawMouse(c, s, animTimer: t * 20, isHappy: happy));
     if (alpha < 1) c.restore();
   }
@@ -284,7 +272,9 @@ class _DemoPainter extends CustomPainter {
     c.drawCircle(
       centre,
       12 * scale,
-      Paint()..shader = RadialGradient(colors: [Colors.white, color]).createShader(Rect.fromCircle(center: centre, radius: 12 * scale)),
+      Paint()
+        ..shader = RadialGradient(colors: [Colors.white, color])
+            .createShader(Rect.fromCircle(center: centre, radius: 12 * scale)),
     );
     _icon(c, icon, centre, 15 * scale, const Color(0xFF1B1538));
   }
@@ -315,7 +305,10 @@ class _DemoPainter extends CustomPainter {
   void _bang(Canvas c, Offset p, String symbol, Color color) {
     c.drawCircle(p, 10, Paint()..color = color);
     final tp = TextPainter(
-      text: TextSpan(text: symbol, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+      text: TextSpan(
+        text: symbol,
+        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900),
+      ),
       textDirection: TextDirection.ltr,
     )..layout();
     tp.paint(c, p - Offset(tp.width / 2, tp.height / 2));
@@ -392,7 +385,14 @@ class _DemoPainter extends CustomPainter {
     }
     _mouse(c, p);
     final tap = seg(0.12, 0.3);
-    if (t < 0.4) _finger(c, target + Offset(0, 22 - 22 * math.min(1, tap * 2)), down: tap > 0.5, ripple: tap > 0.5 ? (tap - 0.5) * 2 : 0);
+    if (t < 0.4) {
+      _finger(
+        c,
+        target + Offset(0, 22 - 22 * math.min(1, tap * 2)),
+        down: tap > 0.5,
+        ripple: tap > 0.5 ? (tap - 0.5) * 2 : 0,
+      );
+    }
   }
 
   void _radar(Canvas c) {
@@ -474,7 +474,10 @@ class _DemoPainter extends CustomPainter {
     final btn = RRect.fromRectAndRadius(const Rect.fromLTWH(14, 108, 72, 28), const Radius.circular(10));
     c.drawRRect(btn, Paint()..color = btnOn ? const Color(0xFFC81D4E) : const Color(0xFFF08A00));
     final tp = TextPainter(
-      text: const TextSpan(text: 'BREAK', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+      text: const TextSpan(
+        text: 'BREAK',
+        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
+      ),
       textDirection: TextDirection.ltr,
     )..layout();
     tp.paint(c, Offset(50 - tp.width / 2, 122 - tp.height / 2));
@@ -499,7 +502,14 @@ class _DemoPainter extends CustomPainter {
     }
     const trap = Offset(150, 45);
     _at(c, trap, 30, (s) => ProceduralPainter.drawMouseTrap(c, s, animTimer: t * 20));
-    final pts = [const Offset(30, 45), const Offset(60, 45), const Offset(60, 105), const Offset(240, 105), const Offset(240, 45), const Offset(275, 45)];
+    final pts = [
+      const Offset(30, 45),
+      const Offset(60, 45),
+      const Offset(60, 105),
+      const Offset(240, 105),
+      const Offset(240, 45),
+      const Offset(275, 45),
+    ];
     _dashed(c, pts, const Color(0xFF34E0C0).withValues(alpha: 0.7));
     _bang(c, const Offset(150, 22), 'x', _red);
     _mouse(c, _along(pts, ease(seg(0.1, 0.9))));
@@ -550,7 +560,9 @@ class _DemoPainter extends CustomPainter {
         // Cat notices the mouse and chases, but falls behind.
         seen = p.dx > 150 && p.dx < 235;
         radarColor = seen ? _red : _teal;
-        if (p.dx > 150) catPos = Offset(math.max(150, 195 - (p.dx - 150) * 0.15 + (t > 0.5 ? 40 * seg(0.5, 0.8) : 0)), 75);
+        if (p.dx > 150) {
+          catPos = Offset(math.max(150, 195 - (p.dx - 150) * 0.15 + (t > 0.5 ? 40 * seg(0.5, 0.8) : 0)), 75);
+        }
       case DemoKind.ghost:
         ghostA = picked ? 0.35 : 1.0;
       default:
@@ -590,10 +602,16 @@ class _DemoPainter extends CustomPainter {
         _ => 'Invisible',
       };
       final tp = TextPainter(
-        text: TextSpan(text: label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)),
+        text: TextSpan(
+          text: label,
+          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
-      final pill = RRect.fromRectAndRadius(Rect.fromLTWH(w / 2 - tp.width / 2 - 10, 8, tp.width + 20, 22), const Radius.circular(11));
+      final pill = RRect.fromRectAndRadius(
+        Rect.fromLTWH(w / 2 - tp.width / 2 - 10, 8, tp.width + 20, 22),
+        const Radius.circular(11),
+      );
       c.drawRRect(pill, Paint()..color = const Color(0xCC5A46E0));
       tp.paint(c, Offset(w / 2 - tp.width / 2, 12));
     }

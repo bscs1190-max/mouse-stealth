@@ -6,6 +6,7 @@ import '../game/services/level_repository.dart';
 import 'demo/demo_scene.dart';
 import 'theme/app_theme.dart';
 import 'widgets/game_ui.dart';
+import 'widgets/outlined_text.dart';
 
 /// Heights the HUD occupies (excluding safe-area padding); the game uses them
 /// to fit the board between the bars.
@@ -113,7 +114,7 @@ class HudOverlay extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text('Level ${levelData.levelNumber}', style: AppText.display(18)),
+                                  OutlinedText('Level ${levelData.levelNumber}', size: 20, align: TextAlign.left),
                                   Text(
                                     levelData.theme.name,
                                     maxLines: 1,

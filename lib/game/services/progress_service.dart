@@ -5,8 +5,10 @@ class ProgressService {
 
   int totalCheeseCurrency = 0;
   int highestUnlockedLevel = 1;
-  bool tutorialSeen = false; // the first-level guide is shown until finished or skipped
+  bool tutorialSeen = true; // Skip redundant multi-page tutorial screens; in-game animated hand guides the gameplay directly!
   bool moveGuideDone = false; // the on-map hand guide of level 1 has been completed
+  int? playerAge;
+  bool get hasSetAge => playerAge != null;
   final Map<int, int> levelStars = {};
 
   void addCheese(int count) {

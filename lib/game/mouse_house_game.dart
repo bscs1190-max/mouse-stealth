@@ -14,6 +14,7 @@ import 'rendering/code_maze_component.dart';
 import 'rendering/forest_background_component.dart';
 import 'rendering/mechanic_components.dart';
 import 'rendering/procedural_obstacle_component.dart';
+import 'rendering/procedural_painter.dart';
 import 'services/level_generator.dart';
 import 'services/level_repository.dart';
 import 'services/progress_service.dart';
@@ -564,7 +565,7 @@ class MouseHouseGame extends FlameGame {
     );
     // The hand dips onto the tile (a tap) and lifts again.
     final dip = (math.sin(_clock * 6) * 0.5 + 0.5);
-    final handCentre = c + Offset(10, 18 - 12 * dip);
+    final handCentre = c + Offset(22, 24 - 10 * dip);
     if (dip > 0.85) {
       canvas.drawCircle(
         c,
@@ -575,34 +576,33 @@ class MouseHouseGame extends FlameGame {
           ..strokeWidth = 2,
       );
     }
-    final icon = Icons.touch_app_rounded;
-    final tp = TextPainter(
-      text: TextSpan(
-        text: String.fromCharCode(icon.codePoint),
-        style: TextStyle(
-          fontSize: 34,
-          fontFamily: icon.fontFamily,
-          package: icon.fontPackage,
-          color: Colors.white,
-          shadows: const [Shadow(color: Colors.black87, blurRadius: 6)],
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, handCentre - Offset(tp.width * 0.35, tp.height * 0.15));
+    // Stylized cartoon pointer glove matching the user reference
+    ProceduralPainter.drawGlovePointer(
+      canvas,
+      handCentre,
+      scale: 0.75,
+      angle: -0.15 + (dip * 0.08),
+    );
     // Label bubble
     final label = TextPainter(
       text: TextSpan(
-        text: guideStep == 0 ? 'Watch' : 'Tap here!',
-        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800),
+        text: guideStep == 0 ? 'Watch & Learn' : 'Tap to Move!',
+        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
     final bubble = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: c + const Offset(0, -30), width: label.width + 18, height: 22),
-      const Radius.circular(11),
+      Rect.fromCenter(center: c + const Offset(0, -32), width: label.width + 20, height: 26),
+      const Radius.circular(13),
     );
-    canvas.drawRRect(bubble, Paint()..color = const Color(0xE65A46E0));
+    canvas.drawRRect(bubble, Paint()..color = const Color(0xF02B63E0));
+    canvas.drawRRect(
+      bubble,
+      Paint()
+        ..color = const Color(0xFF6FB1FF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8,
+    );
     label.paint(canvas, bubble.center - Offset(label.width / 2, label.height / 2));
   }
 

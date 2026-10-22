@@ -7,6 +7,7 @@ import '../game/services/level_generator.dart';
 import '../game/services/progress_service.dart';
 import '../ui/theme/app_theme.dart';
 import '../ui/widgets/game_ui.dart';
+import '../ui/widgets/outlined_text.dart';
 import 'game_screen.dart';
 import 'shop_screen.dart';
 
@@ -140,7 +141,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Level Road', style: AppText.display(26)),
+                          OutlinedText('Level Road', size: 28, align: TextAlign.left),
                           Text('$cleared of 100 cleared', style: AppText.body(12.5)),
                         ],
                       ),

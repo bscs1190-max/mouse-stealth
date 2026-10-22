@@ -4,11 +4,7 @@ class HeartBar extends StatelessWidget {
   final int currentHearts;
   final int maxHearts;
 
-  const HeartBar({
-    super.key,
-    required this.currentHearts,
-    required this.maxHearts,
-  });
+  const HeartBar({super.key, required this.currentHearts, required this.maxHearts});
 
   @override
   Widget build(BuildContext context) {
@@ -18,13 +14,7 @@ class HeartBar extends StatelessWidget {
         color: const Color(0xFF1E2438).withOpacity(0.85),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF333D5E), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 3))],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

@@ -4,6 +4,7 @@ import '../game/services/cosmetics_service.dart';
 import '../game/services/progress_service.dart';
 import '../ui/theme/app_theme.dart';
 import '../ui/widgets/game_ui.dart';
+import '../ui/widgets/outlined_text.dart';
 
 class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
@@ -17,11 +18,7 @@ class _ShopScreenState extends State<ShopScreen> {
   final progress = ProgressService();
   String _category = 'mouse';
 
-  static const _tabs = [
-    ('mouse', 'Mice', '🐭'),
-    ('cat', 'Cats', '🐱'),
-    ('house', 'Houses', '🏠'),
-  ];
+  static const _tabs = [('mouse', 'Mice', '🐭'), ('cat', 'Cats', '🐱'), ('house', 'Houses', '🏠')];
 
   bool _isEquipped(CosmeticItem item) =>
       (item.category == 'mouse' && cosmetics.equippedMouseId == item.id) ||
@@ -37,9 +34,11 @@ class _ShopScreenState extends State<ShopScreen> {
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok
-            ? '🎉 ${item.name} unlocked & equipped!'
-            : 'You need ${item.costInCheese - progress.totalCheeseCurrency} more 🧀'),
+        content: Text(
+          ok
+              ? '🎉 ${item.name} unlocked & equipped!'
+              : 'You need ${item.costInCheese - progress.totalCheeseCurrency} more 🧀',
+        ),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -58,9 +57,15 @@ class _ShopScreenState extends State<ShopScreen> {
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                 child: Row(
                   children: [
-                    RoundIconButton(icon: Icons.arrow_back_rounded, tooltip: 'Back', onTap: () => Navigator.of(context).pop()),
+                    RoundIconButton(
+                      icon: Icons.arrow_back_rounded,
+                      tooltip: 'Back',
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
                     const SizedBox(width: 12),
-                    Expanded(child: Text('Cheese Shop', style: AppText.display(26))),
+                    Expanded(
+                      child: Align(alignment: Alignment.centerLeft, child: OutlinedText('Cheese Shop', size: 28)),
+                    ),
                     CheeseCounter(amount: progress.totalCheeseCurrency),
                   ],
                 ),
@@ -94,8 +99,10 @@ class _ShopScreenState extends State<ShopScreen> {
                                   const SizedBox(width: 6),
                                   Text(
                                     t.$2,
-                                    style: AppText.title(15,
-                                        color: _category == t.$1 ? AppColors.bgBottom : AppColors.textMuted),
+                                    style: AppText.title(
+                                      15,
+                                      color: _category == t.$1 ? AppColors.bgBottom : AppColors.textMuted,
+                                    ),
                                   ),
                                 ],
                               ),

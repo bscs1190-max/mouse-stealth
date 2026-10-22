@@ -2,11 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../game/rendering/procedural_painter.dart';
-import '../game/services/cosmetics_service.dart';
 import '../game/services/progress_service.dart';
 import '../ui/theme/app_theme.dart';
+import '../ui/age_gate_dialog.dart';
+import '../ui/art/poster_card.dart';
 import '../ui/widgets/game_ui.dart';
+import '../ui/widgets/outlined_text.dart';
 import '../ui/tutorial_overlay.dart';
 import 'game_screen.dart';
 import 'level_select_screen.dart';
@@ -20,20 +21,37 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
-  final progress = ProgressService();
-  late final AnimationController _bob;
+  late final AnimationController _pulse;
 
   @override
   void initState() {
     super.initState();
-    _bob = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
+    _pulse = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
+
+    // Ask the age for very first time downloader
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!ProgressService().hasSetAge && mounted) {
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AgeGateDialog(
+            onAgeConfirmed: () {
+              Navigator.of(ctx).pop();
+              setState(() {});
+            },
+          ),
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
-    _bob.dispose();
+    _pulse.dispose();
     super.dispose();
   }
+
+  final progress = ProgressService();
 
   void _openGuide() {
     Navigator.of(context).push(
@@ -54,10 +72,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final totalStars = progress.levelStars.values.fold<int>(0, (a, b) => a + b);
     // Shrink the hero on short phones so everything fits without scrolling.
     final compact = MediaQuery.sizeOf(context).height < 720;
-    final hero = compact ? 130.0 : 190.0;
 
     return Scaffold(
       body: GameBackground(
+        moon: false,
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) => SingleChildScrollView(
@@ -75,86 +93,72 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           CheeseCounter(amount: progress.totalCheeseCurrency),
                         ],
                       ),
-                      SizedBox(height: compact ? 14 : 28),
+                      SizedBox(height: compact ? 6 : 14),
 
-                      // Hero mouse with radar ring
+                      // Logo (gently bobbing)
                       AnimatedBuilder(
-                        animation: _bob,
-                        builder: (context, _) {
-                          final t = _bob.value * 2 * math.pi;
-                          return Transform.translate(
-                            offset: Offset(0, math.sin(t) * 6),
-                            child: SizedBox(
-                              width: hero,
-                              height: hero,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  for (final k in [0.0, 0.5])
-                                    Opacity(
-                                      opacity: (1 - ((_bob.value + k) % 1)).clamp(0.0, 1.0) * 0.5,
-                                      child: Container(
-                                        width: hero * 0.63 + hero * 0.37 * ((_bob.value + k) % 1),
-                                        height: hero * 0.63 + hero * 0.37 * ((_bob.value + k) % 1),
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: AppColors.mint, width: 2),
-                                        ),
-                                      ),
-                                    ),
-                                  Container(
-                                    width: hero * 0.67,
-                                    height: hero * 0.67,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: const RadialGradient(
-                                        colors: [AppColors.surfaceHigh, AppColors.surface],
-                                      ),
-                                      border: Border.all(color: AppColors.mint.withValues(alpha: 0.6), width: 3),
-                                      boxShadow: [
-                                        BoxShadow(color: AppColors.mint.withValues(alpha: 0.35), blurRadius: 40),
-                                      ],
-                                    ),
-                                    child: CustomPaint(painter: _HomeMousePainter(CosmeticsService().equippedMouseId)),
-                                  ),
-                                ],
-                              ),
+                        animation: _pulse,
+                        builder: (context, child) => Transform.translate(
+                          offset: Offset(0, math.sin(_pulse.value * math.pi * 2) * 3),
+                          child: child,
+                        ),
+                        child: Column(
+                          children: [
+                            OutlinedText(
+                              'MOUSE',
+                              size: compact ? 44 : 58,
+                              color: const Color(0xFFFFD54F),
+                              outline: const Color(0xFF1B2250),
                             ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 18),
-
-                      // Title
-                      ShaderMask(
-                        shaderCallback: (r) =>
-                            const LinearGradient(colors: [AppColors.cheese, Color(0xFFFFE8A3), AppColors.cheese])
-                                .createShader(r),
-                        child: Text(
-                          'MOUSE\nSTEALTH',
-                          textAlign: TextAlign.center,
-                          style: AppText.display(compact ? 40 : 52, color: Colors.white).copyWith(
-                            letterSpacing: 3,
-                            shadows: [Shadow(color: AppColors.cheeseDeep.withValues(alpha: 0.7), blurRadius: 24)],
-                          ),
+                            Transform.translate(
+                              offset: const Offset(0, -8),
+                              child: OutlinedText('STEALTH', size: compact ? 38 : 50, color: Colors.white),
+                            ),
+                          ],
                         ),
                       ),
+                      SizedBox(height: compact ? 8 : 14),
+
+                      // The key art in a window, with small ambient animations
+                      PosterCard(height: compact ? 190 : 300),
                       const SizedBox(height: 10),
                       Text(
                         'Sneak past the cats. Grab the cheese. Get home.',
                         textAlign: TextAlign.center,
-                        style: AppText.body(15),
+                        style: AppText.body(14.5, color: const Color(0xFFD7E2FF)),
                       ),
-                      SizedBox(height: compact ? 20 : 36),
+                      SizedBox(height: compact ? 14 : 22),
 
-                      ChunkyButton(
-                        label: 'PLAY  LEVEL $level',
-                        icon: Icons.play_arrow_rounded,
-                        color: AppColors.cheeseDeep,
-                        shadeColor: const Color(0xFFA35400),
-                        height: 64,
-                        fontSize: 22,
-                        onPressed: () => _open(GameScreen(levelNumber: level)),
+                      // Play button breathes so it draws the eye
+                      AnimatedBuilder(
+                        animation: _pulse,
+                        builder: (context, child) {
+                          final k = 0.5 + 0.5 * math.sin(_pulse.value * math.pi * 4);
+                          return Transform.scale(
+                            scale: 1 + 0.018 * k,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(22),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFF9A1F).withValues(alpha: 0.18 + 0.3 * k),
+                                    blurRadius: 14 + 12 * k,
+                                  ),
+                                ],
+                              ),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: ChunkyButton(
+                          label: 'PLAY  LEVEL $level',
+                          icon: Icons.play_arrow_rounded,
+                          color: AppColors.cheeseDeep,
+                          shadeColor: const Color(0xFFA35400),
+                          height: 64,
+                          fontSize: 22,
+                          onPressed: () => _open(GameScreen(levelNumber: level)),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -299,17 +303,4 @@ class _Tip extends StatelessWidget {
       ],
     );
   }
-}
-
-class _HomeMousePainter extends CustomPainter {
-  final String skinId;
-  _HomeMousePainter(this.skinId);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    ProceduralPainter.drawMouse(canvas, size, animTimer: 0.0, isHappy: true, skinId: skinId);
-  }
-
-  @override
-  bool shouldRepaint(covariant _HomeMousePainter oldDelegate) => oldDelegate.skinId != skinId;
 }

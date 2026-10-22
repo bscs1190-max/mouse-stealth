@@ -5,11 +5,7 @@ class CheeseBadge extends StatelessWidget {
   final int collected;
   final int total;
 
-  const CheeseBadge({
-    super.key,
-    required this.collected,
-    required this.total,
-  });
+  const CheeseBadge({super.key, required this.collected, required this.total});
 
   @override
   Widget build(BuildContext context) {
@@ -24,11 +20,7 @@ class CheeseBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFFFB300), width: 1.5),
         boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFFB300).withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: const Color(0xFFFFB300).withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Row(

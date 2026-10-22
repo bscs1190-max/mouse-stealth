@@ -812,4 +812,110 @@ class ProceduralPainter {
       Offset(position.dx - textPainter.width / 2, position.dy - textPainter.height / 2),
     );
   }
+
+  /// Render stylized white cartoon pointer glove matching the user reference
+  /// (white puffy hand, index pointing down-left, plump fingers, puffy wrist cuff,
+  /// 3D volume shading and bold dark silhouette outline).
+  static void drawGlovePointer(Canvas canvas, Offset position, {double scale = 1.0, double angle = 0.0}) {
+    canvas.save();
+    canvas.translate(position.dx, position.dy);
+    canvas.scale(scale);
+    if (angle != 0.0) canvas.rotate(angle);
+
+    // Deep drop shadow beneath glove
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    canvas.drawOval(Rect.fromCenter(center: const Offset(4, 18), width: 54, height: 26), shadowPaint);
+
+    final blackStroke = Paint()
+      ..color = const Color(0xFF11141E)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.6
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+
+    final gloveShader = const LinearGradient(
+      colors: [Color(0xFFFFFFFF), Color(0xFFE8EEF5), Color(0xFFC7D3E5)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+
+    // 1. Wrist Cuff (Puffy pill-shaped roll at base)
+    final cuffRect = Rect.fromCenter(center: const Offset(18, -4), width: 28, height: 38);
+    final cuffRRect = RRect.fromRectAndRadius(cuffRect, const Radius.circular(14));
+    final cuffPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFFFFFFFF), Color(0xFFD6E0EE)],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(cuffRect);
+
+    canvas.save();
+    canvas.translate(18, -4);
+    canvas.rotate(0.35);
+    canvas.translate(-18, 4);
+    canvas.drawRRect(cuffRRect, cuffPaint);
+    canvas.drawRRect(cuffRRect, blackStroke);
+    canvas.restore();
+
+    // 2. Main Hand & Palm Contour
+    final handPath = Path();
+    // Start at cuff attachment
+    handPath.moveTo(12, -18);
+    // Across palm top
+    handPath.quadraticBezierTo(-4, -18, -12, -8);
+    // Index finger extending downward-left
+    handPath.lineTo(-32, 12);
+    // Index finger tip (curved round)
+    handPath.arcToPoint(const Offset(-24, 22), radius: const Radius.circular(7));
+    // Index under-finger crease
+    handPath.lineTo(-6, 12);
+    // Middle finger knuckle and belly
+    handPath.quadraticBezierTo(-2, 24, 8, 22);
+    // Ring finger
+    handPath.quadraticBezierTo(14, 20, 18, 14);
+    // Pinky to lower cuff
+    handPath.quadraticBezierTo(26, 6, 22, -8);
+    handPath.close();
+
+    final handPaint = Paint()
+      ..shader = gloveShader.createShader(const Rect.fromLTWH(-36, -20, 68, 48));
+
+    canvas.drawPath(handPath, handPaint);
+    canvas.drawPath(handPath, blackStroke);
+
+    // 3. Finger Divider Creases & Subtle 3D Volume Highlights
+    final creasePaint = Paint()
+      ..color = const Color(0xFF7A8FA8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+
+    // Crease between index and middle finger
+    final crease1 = Path()
+      ..moveTo(-8, 10)
+      ..quadraticBezierTo(-2, 11, 4, 3);
+    canvas.drawPath(crease1, creasePaint);
+
+    // Crease between middle and ring finger
+    final crease2 = Path()
+      ..moveTo(2, 18)
+      ..quadraticBezierTo(7, 16, 12, 8);
+    canvas.drawPath(crease2, creasePaint);
+
+    // 4. White Top Highlights on Index and Knuckles
+    final highlightPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.85)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+
+    final indexHighlight = Path()
+      ..moveTo(-10, -14)
+      ..lineTo(-26, 6);
+    canvas.drawPath(indexHighlight, highlightPaint);
+
+    canvas.restore();
+  }
 }

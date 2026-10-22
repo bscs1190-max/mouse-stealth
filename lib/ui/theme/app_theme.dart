@@ -25,30 +25,19 @@ class AppColors {
   static const textFaint = Color(0xFF6A72A8);
 }
 
-/// Typography: Fredoka for chunky playful headings, Nunito for readable body.
+/// Typography: Lilita One for chunky "arcade" headings and numbers, Nunito for readable body text.
 class AppText {
-  static TextStyle display(double size, {Color color = AppColors.text}) => GoogleFonts.fredoka(
-        fontSize: size,
-        fontWeight: FontWeight.w700,
-        color: color,
-        height: 1.05,
-      );
+  static TextStyle display(double size, {Color color = AppColors.text}) =>
+      GoogleFonts.lilitaOne(fontSize: size, color: color, height: 1.05);
 
-  static TextStyle title(double size, {Color color = AppColors.text}) => GoogleFonts.fredoka(
-        fontSize: size,
-        fontWeight: FontWeight.w600,
-        color: color,
-      );
+  static TextStyle title(double size, {Color color = AppColors.text}) =>
+      GoogleFonts.lilitaOne(fontSize: size, color: color);
 
   static TextStyle body(double size, {Color color = AppColors.textMuted, FontWeight weight = FontWeight.w600}) =>
       GoogleFonts.nunito(fontSize: size, fontWeight: weight, color: color);
 
-  static TextStyle number(double size, {Color color = AppColors.text}) => GoogleFonts.fredoka(
-        fontSize: size,
-        fontWeight: FontWeight.w600,
-        color: color,
-        fontFeatures: const [FontFeature.tabularFigures()],
-      );
+  static TextStyle number(double size, {Color color = AppColors.text}) =>
+      GoogleFonts.lilitaOne(fontSize: size, color: color);
 }
 
 class AppTheme {

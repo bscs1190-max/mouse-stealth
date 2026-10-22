@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'theme/app_theme.dart';
+import 'widgets/arcade_art.dart';
 import 'widgets/game_ui.dart';
+import 'widgets/outlined_text.dart';
 
+/// Defeat screen: red tiled backdrop, a grinning cat and big clear options.
 class GameOverDialog extends StatelessWidget {
   final VoidCallback onWatchAdContinue;
   final VoidCallback onRestart;
@@ -19,53 +22,73 @@ class GameOverDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0.8, end: 1.0),
-        duration: const Duration(milliseconds: 380),
-        curve: Curves.easeOutBack,
-        builder: (context, s, child) => Transform.scale(scale: s, child: child),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: GlassCard(
-            color: AppColors.surface,
-            borderColor: AppColors.coral.withValues(alpha: 0.8),
-            radius: 30,
-            padding: const EdgeInsets.fromLTRB(22, 24, 22, 14),
+    return Material(
+      color: Colors.black,
+      child: GameBackground(
+        top: const Color(0xFFD1405F),
+        bottom: const Color(0xFF3A0F3C),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 76,
-                  height: 76,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.coral.withValues(alpha: 0.15),
-                    border: Border.all(color: AppColors.coral.withValues(alpha: 0.6), width: 2),
-                  ),
-                  child: Icon(
-                    timeUp ? Icons.timer_off_rounded : Icons.heart_broken_rounded,
-                    color: AppColors.coral,
-                    size: 40,
+                const Spacer(flex: 2),
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.4, end: 1),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.elasticOut,
+                  builder: (context, s, child) => Transform.scale(scale: s, child: child),
+                  child: OutlinedText(
+                    timeUp ? "TIME'S UP!" : 'DEFEAT',
+                    size: 58,
+                    color: const Color(0xFFFFE0E8),
+                    outline: const Color(0xFF4A0F2A),
                   ),
                 ),
-                const SizedBox(height: 14),
-                Text(timeUp ? "Time's up!" : 'Out of lives!', style: AppText.display(30)),
+                const SizedBox(height: 4),
+                RibbonBanner(
+                  fillTop: const Color(0xFFFF8FA8),
+                  fillBottom: const Color(0xFFD03A68),
+                  border: const Color(0xFF5A1230),
+                  height: 56,
+                  child: OutlinedText(
+                    timeUp ? 'The clock won this round' : 'The cats got you',
+                    size: 20,
+                    outline: const Color(0xFF5A1230),
+                  ),
+                ),
+                const Spacer(),
+                Stack(
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    const CharacterArt(kind: ArtKind.cat, size: 150, alert: true),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Icon(
+                        timeUp ? Icons.timer_off_rounded : Icons.heart_broken_rounded,
+                        color: const Color(0xFFFFE0E8),
+                        size: 44,
+                        shadows: const [Shadow(color: Color(0xFF4A0F2A), offset: Offset(0, 3), blurRadius: 4)],
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 6),
                 Text(
                   timeUp
-                      ? 'The clock beat you this time.'
-                      : 'The cats got the better of you.\nStay outside their radar and hide behind walls.',
+                      ? 'Plan a faster route, or smash a wall for a shortcut.'
+                      : 'Stay outside the radar, hide behind walls and grab an orb before a cat.',
                   textAlign: TextAlign.center,
-                  style: AppText.body(14),
+                  style: AppText.body(14, color: const Color(0xFFFFD6E0)),
                 ),
-                const SizedBox(height: 22),
+                const Spacer(flex: 2),
                 ChunkyButton(
                   label: timeUp ? 'CONTINUE  +30s' : 'CONTINUE  +1 ❤',
                   icon: Icons.play_circle_fill_rounded,
                   color: AppColors.cheeseDeep,
                   shadeColor: const Color(0xFFA35400),
-                  fontSize: 18,
+                  fontSize: 19,
                   onPressed: onWatchAdContinue,
                 ),
                 const SizedBox(height: 12),
@@ -74,14 +97,14 @@ class GameOverDialog extends StatelessWidget {
                   icon: Icons.refresh_rounded,
                   color: AppColors.skyDeep,
                   shadeColor: const Color(0xFF14559A),
-                  fontSize: 18,
+                  fontSize: 19,
                   onPressed: onRestart,
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 TextButton.icon(
                   onPressed: onBackToLevels,
-                  icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textMuted, size: 18),
-                  label: Text('Back', style: AppText.body(14)),
+                  icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFFFFD6E0), size: 18),
+                  label: Text('Back to menu', style: AppText.body(14, color: const Color(0xFFFFD6E0))),
                 ),
               ],
             ),
